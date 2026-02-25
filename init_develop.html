@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1단계: 현대적 인프라 및 Jakarta EE 11 기초 구축</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Font Awesome (for icons, replacing SVG) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Chosen Palette: Slate & Indigo (Professional, Developer-focused) -->
+    <!-- Application Structure Plan: 
+         The app uses a 'Developer Dashboard' metaphor. 
+         - Left Sidebar: Navigation through the logical steps of the setup process (Environment, Project, Server, Code, Jakarta Insights).
+         - Main Content Area: Dynamic content switching based on navigation.
+         - Interactive Elements: Checklists for installation, Tabs for code comparison/server switching, and Charts for Jakarta EE version comparison.
+         - Rationale: Learning a dev environment is a linear process (Step 1 -> Step 2), but users need to jump back and forth to reference config settings. A dashboard layout supports both linear progression and random access.
+    -->
+
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        .code-preview {
+            font-family: 'Consolas', 'Monaco', monospace;
+            white-space: pre;
+            overflow-x: auto;
+        }
+        .step-active {
+            border-left: 4px solid #4f46e5;
+            background-color: #f1f5f9;
+            color: #1e293b;
+            font-weight: 600;
+        }
+        .step-inactive {
+            border-left: 4px solid transparent;
+            color: #64748b;
+        }
+        .step-inactive:hover {
+            background-color: #f8fafc;
+            color: #334155;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 h-screen overflow-hidden flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-white border-b border-slate-200 h-16 flex items-center px-6 justify-between flex-shrink-0 z-10">
+        <div class="flex items-center gap-3">
+            <div class="bg-indigo-600 text-white p-2 rounded-lg">
+                <i class="fa-solid fa-layer-group"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold text-slate-800">JSP & Jakarta EE 11 마스터 클래스</h1>
+                <p class="text-xs text-slate-500">1단계: 현대적 인프라 구축 (VS Code + Maven + Payara/Tomcat)</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <div class="text-sm font-medium text-slate-600">진행률: <span id="overall-progress">0%</span></div>
+            <div class="w-32 h-2 bg-slate-200 rounded-full overflow-hidden">
+                <div id="progress-bar" class="h-full bg-indigo-600 transition-all duration-500" style="width: 0%"></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Layout -->
+    <div class="flex flex-1 overflow-hidden">
+        
+        <!-- Sidebar Navigation -->
+        <aside class="w-64 bg-white border-r border-slate-200 flex flex-col overflow-y-auto hidden md:flex">
+            <div class="p-4">
+                <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">학습 단계</h3>
+                <nav class="space-y-1">
+                    <button onclick="navigateTo('intro')" id="nav-intro" class="w-full text-left px-4 py-3 rounded text-sm transition-colors step-active">
+                        <i class="fa-solid fa-info-circle w-6"></i> 개요 및 목표
+                    </button>
+                    <button onclick="navigateTo('env')" id="nav-env" class="w-full text-left px-4 py-3 rounded text-sm transition-colors step-inactive">
+                        <i class="fa-solid fa-tools w-6"></i> 1. 환경 설정 (Maven & VS Code)
+                    </button>
+                    <button onclick="navigateTo('project')" id="nav-project" class="w-full text-left px-4 py-3 rounded text-sm transition-colors step-inactive">
+                        <i class="fa-solid fa-folder-tree w-6"></i> 2. 프로젝트 생성 및 구조
+                    </button>
+                    <button onclick="navigateTo('server')" id="nav-server" class="w-full text-left px-4 py-3 rounded text-sm transition-colors step-inactive">
+                        <i class="fa-solid fa-server w-6"></i> 3. 서버 연동 (Tomcat & Payara)
+                    </button>
+                    <button onclick="navigateTo('servlet')" id="nav-servlet" class="w-full text-left px-4 py-3 rounded text-sm transition-colors step-inactive">
+                        <i class="fa-solid fa-code w-6"></i> 4. Servlet 6.1 & JSP 코딩
+                    </button>
+                    <button onclick="navigateTo('jakarta')" id="nav-jakarta" class="w-full text-left px-4 py-3 rounded text-sm transition-colors step-inactive">
+                        <i class="fa-solid fa-chart-line w-6"></i> 5. Jakarta EE 심화 분석
+                    </button>
+                </nav>
+            </div>
+            
+            <div class="mt-auto p-4 bg-slate-50 border-t border-slate-200">
+                <div class="p-3 bg-indigo-50 rounded border border-indigo-100">
+                    <h4 class="text-xs font-bold text-indigo-800 mb-1"><i class="fa-solid fa-lightbulb text-indigo-600"></i> Tip</h4>
+                    <p class="text-xs text-indigo-700 leading-relaxed">
+                        VS Code에는 "Run on Server"가 없습니다. "Community Server Connector" 확장을 사용하는 것이 핵심입니다.
+                    </p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 overflow-y-auto p-6 md:p-10 relative" id="main-content">
+            <!-- Dynamic Content Injected Here via JS -->
+        </main>
+
+    </div>
+
+    <!-- JavaScript Logic -->
+    <script>
+        // --- 1. State & Data Initialization ---
+        const state = {
+            currentSection: 'intro',
+            progress: {
+                maven: false,
+                vscode: false,
+                extensions: false,
+                server: false
+            }
+        };
+
+        const contentData = {
+            intro: {
+                title: "연구 시작: VS Code로 전환하는 JSP 개발",
+                content: `
+                    <div class="max-w-4xl mx-auto space-y-8">
+                        <div class="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
+                            <p class="text-lg text-slate-600 leading-relaxed mb-4">
+                                과거의 Eclipse 중심 개발 환경에서 벗어나, <strong>Visual Studio Code</strong>와 <strong>Jakarta EE 11</strong>을 활용한 현대적인 웹 개발 환경을 구축합니다.
+                                VS Code는 가볍고 강력하지만, JSP/Servlet 개발을 위해서는 Eclipse가 자동으로 해주던 많은 부분(Maven 설정, 서버 연결 등)을 <strong>직접 이해하고 구성</strong>해야 합니다.
+                            </p>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+                                <div class="p-4 bg-blue-50 rounded border border-blue-100">
+                                    <h3 class="font-bold text-blue-800 mb-2">학습 목표</h3>
+                                    <ul class="list-disc list-inside text-sm text-blue-700 space-y-1">
+                                        <li>Maven 수동 설치 및 환경 변수 설정</li>
+                                        <li>VS Code 확장 프로그램을 통한 서버 제어 ("Run on Server" 대체)</li>
+                                        <li>Tomcat 10.1+ 및 Payara 6 (Jakarta EE 10/11) 연동</li>
+                                        <li>Servlet 6.1의 Annotation 기반 매핑 이해</li>
+                                    </ul>
+                                </div>
+                                <div class="p-4 bg-amber-50 rounded border border-amber-100">
+                                    <h3 class="font-bold text-amber-800 mb-2">주요 변경 사항</h3>
+                                    <ul class="list-disc list-inside text-sm text-amber-700 space-y-1">
+                                        <li>패키지명 변경: javax.* → <strong>jakarta.*</strong></li>
+                                        <li>web.xml 의존도 감소 → Annotation 중심</li>
+                                        <li>현대적 빌드 도구 (Maven/Gradle) 필수 사용</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex justify-center">
+                            <button onclick="navigateTo('env')" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors shadow-md">
+                                환경 구축 시작하기 <i class="fa-solid fa-arrow-right ml-2"></i>
+                            </button>
+                        </div>
+                    </div>
+                `
+            },
+            env: {
+                title: "1. 필수 개발 도구 및 Maven 설치",
+                intro: "VS Code는 Java 프로젝트를 위해 Maven이나 Gradle 같은 빌드 도구를 필요로 합니다. Eclipse와 달리 내장되어 있지 않으므로 직접 설치해야 합니다.",
+                content: `
+                    <div class="max-w-4xl mx-auto space-y-6">
+                        <div class="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
+                            <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center">
+                                <i class="fa-brands fa-java text-red-500 mr-2"></i> Apache Maven 설치 (필수)
+                            </h3>
+                            <p class="text-sm text-slate-600 mb-4">VS Code는 시스템에 설치된 Maven을 사용하여 프로젝트를 빌드합니다.</p>
+                            
+                            <div class="space-y-3 bg-slate-50 p-4 rounded border border-slate-200 text-sm">
+                                <div class="flex gap-3">
+                                    <span class="flex-shrink-0 w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold">1</span>
+                                    <p><strong>다운로드:</strong> <a href="https://maven.apache.org/download.cgi" target="_blank" class="text-blue-600 underline">maven.apache.org</a>에서 'Binary zip archive'를 다운로드합니다.</p>
+                                </div>
+                                <div class="flex gap-3">
+                                    <span class="flex-shrink-0 w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold">2</span>
+                                    <p><strong>압축 해제:</strong> 원하는 경로(예: <code>C:\\dev\\apache-maven-3.9.x</code>)에 압축을 풉니다.</p>
+                                </div>
+                                <div class="flex gap-3">
+                                    <span class="flex-shrink-0 w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold">3</span>
+                                    <p><strong>환경 변수 설정 (Windows):</strong> <br>
+                                    - 시스템 환경 변수 <code>Path</code> 편집<br>
+                                    - Maven의 <code>bin</code> 폴더 경로 추가 (예: <code>C:\\dev\\apache-maven-3.9.x\\bin</code>)</p>
+                                </div>
+                                <div class="flex gap-3">
+                                    <span class="flex-shrink-0 w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold">4</span>
+                                    <p><strong>확인:</strong> 터미널(CMD)에서 <code>mvn -v</code> 입력 시 버전 정보가 나와야 합니다.</p>
+                                </div>
+                            </div>
+                            <div class="mt-4 flex items-center gap-2 cursor-pointer" onclick="toggleCheck('maven')">
+                                <div id="check-maven" class="w-5 h-5 border-2 border-slate-400 rounded flex items-center justify-center text-white transition-colors">
+                                    <i class="fa-solid fa-check text-xs"></i>
+                                </div>
+                                <span class="text-sm font-medium">Maven 설치 및 Path 설정 완료</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
+                            <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center">
+                                <i class="fa-solid fa-puzzle-piece text-indigo-500 mr-2"></i> VS Code 확장 프로그램 (Extensions)
+                            </h3>
+                            <p class="text-sm text-slate-600 mb-4">Eclipse의 "Run on Server" 기능을 대체하기 위해 다음 확장이 필수적입니다.</p>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div class="border p-4 rounded hover:shadow-md transition-shadow">
+                                    <h4 class="font-bold text-slate-800">Extension Pack for Java</h4>
+                                    <p class="text-xs text-slate-500 mt-1">Microsoft 제공. Java 개발의 필수 패키지.</p>
+                                </div>
+                                <div class="border p-4 rounded hover:shadow-md transition-shadow border-indigo-200 bg-indigo-50">
+                                    <h4 class="font-bold text-indigo-800">Community Server Connector</h4>
+                                    <p class="text-xs text-indigo-600 mt-1"><strong>핵심:</strong> RSP UI. Tomcat, Payara 등을 제어하고 배포하는 기능을 제공합니다.</p>
+                                </div>
+                            </div>
+                             <div class="mt-4 flex items-center gap-2 cursor-pointer" onclick="toggleCheck('extensions')">
+                                <div id="check-extensions" class="w-5 h-5 border-2 border-slate-400 rounded flex items-center justify-center text-white transition-colors">
+                                    <i class="fa-solid fa-check text-xs"></i>
+                                </div>
+                                <span class="text-sm font-medium">확장 프로그램 설치 완료</span>
+                            </div>
+                        </div>
+                    </div>
+                `
+            },
+            project: {
+                title: "2. Maven 웹 프로젝트 생성",
+                intro: "Maven Archetype을 사용하여 표준 웹 프로젝트 구조를 생성합니다. 이 구조는 모든 Java IDE에서 호환됩니다.",
+                content: `
+                    <div class="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div class="space-y-6">
+                             <div class="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
+                                <h3 class="font-bold text-slate-800 mb-3">프로젝트 생성 명령</h3>
+                                <p class="text-sm text-slate-600 mb-2">VS Code 터미널을 열고 아래 명령어를 입력합니다.</p>
+                                <div class="bg-slate-900 text-green-400 p-3 rounded font-mono text-xs overflow-x-auto">
+                                    mvn archetype:generate -DgroupId=com.study -DartifactId=jsp-study-01 -DarchetypeArtifactId=maven-archetype-webapp -DinteractiveMode=false
+                                </div>
+                                <div class="mt-3 text-sm text-slate-600">
+                                    <span class="font-semibold text-red-500">주의:</span> 생성 후 <code>pom.xml</code>에서 컴파일러 버전을 Java 17 이상으로 수정해야 합니다.
+                                </div>
+                            </div>
+
+                            <div class="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
+                                <h3 class="font-bold text-slate-800 mb-3">POM.xml 설정 (Jakarta EE 11)</h3>
+                                <p class="text-sm text-slate-600 mb-2">Jakarta EE 10/11용 의존성을 추가합니다.</p>
+                                <div class="code-preview bg-slate-50 p-3 rounded text-xs border h-48 overflow-y-auto">
+&lt;dependencies&gt;
+    &lt;!-- Jakarta Servlet API 6.0 --&gt;
+    &lt;dependency&gt;
+        &lt;groupId&gt;jakarta.servlet&lt;/groupId&gt;
+        &lt;artifactId&gt;jakarta.servlet-api&lt;/artifactId&gt;
+        &lt;version&gt;6.0.0&lt;/version&gt;
+        &lt;scope&gt;provided&lt;/scope&gt;
+    &lt;/dependency&gt;
+    &lt;!-- JSP API --&gt;
+    &lt;dependency&gt;
+        &lt;groupId&gt;jakarta.servlet.jsp&lt;/groupId&gt;
+        &lt;artifactId&gt;jakarta.servlet.jsp-api&lt;/artifactId&gt;
+        &lt;version&gt;3.1.1&lt;/version&gt;
+        &lt;scope&gt;provided&lt;/scope&gt;
+    &lt;/dependency&gt;
+&lt;/dependencies&gt;
+
+&lt;properties&gt;
+    &lt;maven.compiler.source&gt;17&lt;/maven.compiler.source&gt;
+    &lt;maven.compiler.target&gt;17&lt;/maven.compiler.target&gt;
+&lt;/properties&gt;
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-indigo-900 text-indigo-100 p-6 rounded-lg shadow-lg">
+                            <h3 class="font-bold text-white mb-4"><i class="fa-solid fa-sitemap"></i> 표준 디렉토리 구조</h3>
+                            <ul class="space-y-2 font-mono text-sm">
+                                <li class="flex items-center"><i class="fa-regular fa-folder-open mr-2 text-yellow-400"></i> jsp-study-01</li>
+                                <li class="ml-6 flex items-center"><i class="fa-brands fa-markdown mr-2 text-blue-300"></i> pom.xml</li>
+                                <li class="ml-6 flex items-center"><i class="fa-regular fa-folder mr-2 text-yellow-400"></i> src</li>
+                                <li class="ml-12 flex items-center"><i class="fa-regular fa-folder mr-2 text-yellow-400"></i> main</li>
+                                <li class="ml-16 flex items-center text-green-300 font-bold"><i class="fa-regular fa-folder mr-2 text-yellow-400"></i> java (서블릿 코드)</li>
+                                <li class="ml-20 text-slate-400">└── com/study/HelloServlet.java</li>
+                                <li class="ml-16 flex items-center"><i class="fa-regular fa-folder mr-2 text-yellow-400"></i> webapp (JSP 위치)</li>
+                                <li class="ml-20 flex items-center"><i class="fa-regular fa-folder mr-2 text-yellow-400"></i> WEB-INF</li>
+                                <li class="ml-24 text-slate-400">└── web.xml</li>
+                                <li class="ml-20 text-slate-400">└── index.jsp</li>
+                            </ul>
+                            <div class="mt-6 p-3 bg-indigo-800 rounded text-xs border border-indigo-700">
+                                <strong>Tip:</strong> <code>src/main/java</code> 폴더는 직접 생성해야 할 수 있습니다.
+                            </div>
+                        </div>
+                    </div>
+                `
+            },
+            server: {
+                title: "3. 서버 연동: Tomcat vs Payara",
+                intro: "VS Code의 Servers 탭을 사용하여 서버를 제어합니다.",
+                content: `
+                    <div class="max-w-4xl mx-auto">
+                        <div class="flex justify-center mb-8">
+                            <div class="bg-slate-200 p-1 rounded-full flex">
+                                <button onclick="toggleServer('tomcat')" id="btn-tomcat" class="px-6 py-2 rounded-full font-medium text-sm transition-all bg-white shadow text-slate-800">Apache Tomcat</button>
+                                <button onclick="toggleServer('payara')" id="btn-payara" class="px-6 py-2 rounded-full font-medium text-sm transition-all text-slate-600 hover:text-slate-800">Payara (GlassFish)</button>
+                            </div>
+                        </div>
+
+                        <div id="content-tomcat" class="space-y-6 animate-fade-in">
+                            <div class="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
+                                <h3 class="font-bold text-lg text-slate-800 mb-2">Tomcat 10.1+ (Jakarta EE 10 지원)</h3>
+                                <p class="text-sm text-slate-600 mb-4">가장 대중적인 서블릿 컨테이너입니다.</p>
+                                <ol class="list-decimal list-inside space-y-3 text-sm text-slate-700">
+                                    <li><strong>다운로드:</strong> Tomcat 10.1 zip 압축 해제.</li>
+                                    <li><strong>서버 추가:</strong> SERVERS 패널에서 (+) 클릭 → 'Tomcat 10.x' 선택.</li>
+                                    <li><strong>경로 지정:</strong> 압축 푼 Tomcat 폴더 선택.</li>
+                                    <li><strong>배포:</strong> 서버 우클릭 → Add Deployment.</li>
+                                </ol>
+                            </div>
+                        </div>
+
+                        <div id="content-payara" class="hidden space-y-6 animate-fade-in">
+                            <div class="bg-white p-6 rounded-lg shadow-sm border border-orange-100 relative overflow-hidden">
+                                <h3 class="font-bold text-lg text-slate-800 mb-2">Payara Server 6 (Jakarta EE 10 Full Platform)</h3>
+                                <p class="text-sm text-slate-600 mb-4">JPA, CDI 등이 내장된 엔터프라이즈 서버입니다.</p>
+                                <ol class="list-decimal list-inside space-y-3 text-sm text-slate-700">
+                                    <li><strong>다운로드:</strong> Payara Community Edition 다운로드.</li>
+                                    <li><strong>서버 선택:</strong> 'GlassFish / Payara' 선택.</li>
+                                    <li><strong>특징:</strong> 5단계 JPA 실습 시 별도 설정 없이 동작하므로 추천합니다.</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                `
+            },
+            servlet: {
+                title: "4. Servlet 구현 및 JSP 실행",
+                intro: "Jakarta Servlet 6.0 어노테이션 기반 스타일을 구현합니다.",
+                content: `
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-6xl mx-auto">
+                        <div class="space-y-6">
+                            <div class="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
+                                <h3 class="font-bold text-slate-800 mb-3">어노테이션 기반 매핑</h3>
+                                <p class="text-sm text-slate-600 mb-4">
+                                    <code>web.xml</code> 설정 없이 <code>@WebServlet("/hello")</code>로 간단히 매핑합니다.
+                                </p>
+                                <div class="bg-indigo-50 p-3 rounded border border-indigo-100">
+                                    <h4 class="font-bold text-indigo-800 text-xs mb-1">핵심: javax → jakarta</h4>
+                                    <p class="text-xs text-indigo-700">임포트 시 반드시 jakarta 패키지를 사용해야 합니다.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-800 rounded-lg shadow-lg overflow-hidden flex flex-col h-[500px]">
+                            <div class="flex bg-slate-900 text-slate-400 text-xs border-b border-slate-700">
+                                <button onclick="showCode('servlet')" id="tab-servlet" class="px-4 py-2 bg-slate-800 text-green-400 border-t-2 border-green-400">HelloServlet.java</button>
+                                <button onclick="showCode('jsp')" id="tab-jsp" class="px-4 py-2 hover:bg-slate-800 hover:text-slate-200 transition-colors">index.jsp</button>
+                            </div>
+                            <div class="p-4 overflow-auto flex-1 font-mono text-sm">
+                                <div id="code-servlet" class="text-slate-300">
+<span class="text-purple-400">package</span> com.study;
+<span class="text-purple-400">import</span> jakarta.servlet.annotation.WebServlet;
+...
+<span class="text-yellow-300">@WebServlet</span>(<span class="text-green-300">"/hello"</span>)
+<span class="text-purple-400">public class</span> <span class="text-yellow-200">HelloServlet</span> <span class="text-purple-400">extends</span> HttpServlet {
+    <span class="text-purple-400">protected void</span> doGet(...) {
+        req.setAttribute(<span class="text-green-300">"msg"</span>, <span class="text-green-300">"Hello World"</span>);
+        req.getRequestDispatcher(<span class="text-green-300">"/index.jsp"</span>).forward(req, resp);
+    }
+}
+                                </div>
+                                <div id="code-jsp" class="hidden text-slate-300">
+&lt;!-- JSP 코드 --&gt;
+&lt;h1&gt;JSP 테스트&lt;/h1&gt;
+&lt;p&gt;서버 메시지: <span class="text-yellow-300">\${msg}</span>&lt;/p&gt;
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `
+            },
+            jakarta: {
+                title: "5. Jakarta EE vs J2EE: 변경 사항 분석",
+                intro: "기술 스택의 변화를 시각적으로 이해합니다.",
+                content: `
+                    <div class="max-w-4xl mx-auto space-y-8">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+                                <h4 class="font-bold text-slate-800 text-center mb-4">EE 버전별 현대화 지수</h4>
+                                <div class="chart-container">
+                                    <canvas id="jakartaChart"></canvas>
+                                </div>
+                            </div>
+                            <div class="space-y-4">
+                                <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200 h-full">
+                                    <h4 class="font-bold text-slate-800 mb-3">javax → jakarta</h4>
+                                    <p class="text-sm text-slate-600 leading-relaxed">
+                                        Oracle의 상표권 문제로 패키지명이 변경되었습니다. 2020년 이후 기술은 모두 <code>jakarta</code>를 사용합니다.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `
+            }
+        };
+
+        // --- 2. UI Logic Functions ---
+        function navigateTo(sectionKey) {
+            if (!contentData[sectionKey]) return;
+            state.currentSection = sectionKey;
+            
+            // Update Sidebar UI
+            document.querySelectorAll('nav button').forEach(btn => {
+                btn.classList.remove('step-active');
+                btn.classList.add('step-inactive');
+            });
+            const activeBtn = document.getElementById(`nav-${sectionKey}`);
+            if(activeBtn) {
+                activeBtn.classList.remove('step-inactive');
+                activeBtn.classList.add('step-active');
+            }
+
+            // Render Content
+            const mainContent = document.getElementById('main-content');
+            const data = contentData[sectionKey];
+            
+            mainContent.innerHTML = `
+                <div class="animate-fade-in">
+                    <h2 class="text-2xl font-bold text-slate-800 mb-2">${data.title}</h2>
+                    ${data.intro ? `<p class="text-slate-500 mb-8 pb-4 border-b border-slate-200">${data.intro}</p>` : ''}
+                    ${data.content}
+                </div>
+            `;
+
+            if (sectionKey === 'jakarta') {
+                renderChart();
+            }
+        }
+
+        function toggleCheck(key) {
+            const el = document.getElementById(`check-${key}`);
+            state.progress[key] = !state.progress[key];
+            
+            if(state.progress[key]) {
+                el.classList.remove('border-slate-400');
+                el.classList.add('bg-green-500', 'border-green-500');
+            } else {
+                el.classList.add('border-slate-400');
+                el.classList.remove('bg-green-500', 'border-green-500');
+            }
+            updateProgressBar();
+        }
+
+        function updateProgressBar() {
+            const total = Object.keys(state.progress).length;
+            const current = Object.values(state.progress).filter(Boolean).length;
+            const percent = Math.round((current / total) * 100);
+            
+            const pb = document.getElementById('progress-bar');
+            const pt = document.getElementById('overall-progress');
+            if(pb) pb.style.width = `${percent}%`;
+            if(pt) pt.innerText = `${percent}%`;
+        }
+
+        function toggleServer(server) {
+            const tomcatBtn = document.getElementById('btn-tomcat');
+            const payaraBtn = document.getElementById('btn-payara');
+            const tomcatContent = document.getElementById('content-tomcat');
+            const payaraContent = document.getElementById('content-payara');
+
+            if (server === 'tomcat') {
+                tomcatBtn.classList.add('bg-white', 'shadow', 'text-slate-800');
+                payaraBtn.classList.remove('bg-white', 'shadow', 'text-slate-800');
+                tomcatContent.classList.remove('hidden');
+                payaraContent.classList.add('hidden');
+            } else {
+                payaraBtn.classList.add('bg-white', 'shadow', 'text-slate-800');
+                tomcatBtn.classList.remove('bg-white', 'shadow', 'text-slate-800');
+                payaraContent.classList.remove('hidden');
+                tomcatContent.classList.add('hidden');
+            }
+        }
+
+        function showCode(type) {
+            const btnServlet = document.getElementById('tab-servlet');
+            const btnJsp = document.getElementById('tab-jsp');
+            const codeServlet = document.getElementById('code-servlet');
+            const codeJsp = document.getElementById('code-jsp');
+
+            if (type === 'servlet') {
+                btnServlet.classList.add('bg-slate-800', 'text-green-400', 'border-t-2', 'border-green-400');
+                btnJsp.classList.remove('bg-slate-800', 'text-green-400', 'border-t-2', 'border-green-400');
+                codeServlet.classList.remove('hidden');
+                codeJsp.classList.add('hidden');
+            } else {
+                btnJsp.classList.add('bg-slate-800', 'text-green-400', 'border-t-2', 'border-green-400');
+                btnServlet.classList.remove('bg-slate-800', 'text-green-400', 'border-t-2', 'border-green-400');
+                codeJsp.classList.remove('hidden');
+                codeServlet.classList.add('hidden');
+            }
+        }
+
+        function renderChart() {
+            const canvas = document.getElementById('jakartaChart');
+            if(!canvas) return;
+            const ctx = canvas.getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Java EE 8', 'Jakarta EE 9', 'Jakarta EE 10', 'Jakarta EE 11'],
+                    datasets: [{
+                        label: '현대화 수준',
+                        data: [40, 60, 85, 100],
+                        backgroundColor: ['#94a3b8', '#64748b', '#6366f1', '#4f46e5'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true, max: 100 } }
+                }
+            });
+        }
+
+        // --- 3. Entry Point ---
+        window.addEventListener('load', () => {
+            navigateTo('intro');
+        });
+
+    </script>
+</body>
+</html>
